@@ -1,0 +1,124 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id        String   @id
+  email     String   @unique
+  createdAt DateTime @default(now())
+
+  contacts   Contact[]
+  segments   Segment[]
+  campaigns  Campaign[]
+
+  @@map("users")
+}
+
+model Contact {
+  id           String    @id @default(cuid())
+  email        String
+  firstName    String?
+  lastName     String?
+  tags         String    @default("[]")
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subscribedAt DateTime  @default(now())
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  emailEvents  EmailEvent[]
+  unsubscribes Unsubscribe[]
+
+  @@unique([email, userId])
+  @@index([userId])
+  @@map("contacts")
+}
+
+model Segment {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  filterType  String   @default("all")
+  filterTags  String   @default("[]")
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  campaigns Campaign[]
+
+  @@index([userId])
+  @@map("segments")
+}
+
+model Campaign {
+  id                String    @id @default(cuid())
+  name              String
+  subject           String
+  fromName          String
+  fromEmail         String
+  replyTo           String?
+  htmlContent       String
+  textContent       String?
+  status            String    @default("draft")
+  scheduledAt       DateTime?
+  sentAt            DateTime?
+  userId            String
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  segmentId         String?
+  segment           Segment?  @relation(fields: [segmentId], references: [id])
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  totalSent         Int       @default(0)
+  totalDelivered    Int       @default(0)
+  totalOpens        Int       @default(0)
+  totalUniqueOpens  Int       @default(0)
+  totalClicks       Int       @default(0)
+  totalUniqueClicks Int       @default(0)
+  totalBounces      Int       @default(0)
+  totalUnsubscribes Int       @default(0)
+
+  emailEvents EmailEvent[]
+
+  @@index([userId])
+  @@map("campaigns")
+}
+
+model EmailEvent {
+  id         String    @id @default(cuid())
+  type       String
+  campaignId String
+  campaign   Campaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  contactId  String?
+  contact    Contact?  @relation(fields: [contactId], references: [id])
+  email      String
+  trackingId String    @unique @default(cuid())
+  url        String?
+  metadata   String?
+  resendId   String?
+  createdAt  DateTime  @default(now())
+
+  @@index([campaignId])
+  @@index([contactId])
+  @@index([trackingId])
+  @@map("email_events")
+}
+
+model Unsubscribe {
+  id         String   @id @default(cuid())
+  email      String
+  token      String   @unique @default(cuid())
+  contactId  String?
+  contact    Contact? @relation(fields: [contactId], references: [id])
+  campaignId String?
+  createdAt  DateTime @default(now())
+
+  @@unique([email, campaignId])
+  @@map("unsubscribes")
+}
