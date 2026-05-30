@@ -13,7 +13,7 @@ import Link from "next/link";
 export default async function DashboardPage() {
   const user = await getCurrentUser();
 
-  const [totalContacts, totalCampaigns, recentCampaigns, events] =
+  const [totalContacts, totalCampaigns, recentCampaigns, events, recentSentEvents, recentOpenPairs, recentClickPairs] =
     await Promise.all([
       prisma.contact.count({ where: { userId: user.id } }),
       prisma.campaign.count({ where: { userId: user.id } }),
@@ -21,11 +21,27 @@ export default async function DashboardPage() {
         where: { userId: user.id },
         orderBy: { createdAt: "desc" },
         take: 5,
-        select: { id: true, name: true, status: true, totalSent: true, totalOpens: true, totalClicks: true, sentAt: true },
+        select: { id: true, name: true, status: true, sentAt: true },
       }),
       prisma.emailEvent.findMany({
-        where: { campaign: { userId: user.id }, createdAt: { gte: subDays(new Date(), 30) } },
+        where: { campaign: { userId: user.id }, createdAt: { gte: subDays(new Date(), 30) }, type: { in: ["sent", "opened", "clicked"] } },
         select: { type: true, createdAt: true },
+      }),
+      // Last 30 days: sent count from event table
+      prisma.emailEvent.count({
+        where: { type: "sent", campaign: { userId: user.id }, createdAt: { gte: subDays(new Date(), 30) } },
+      }),
+      // Last 30 days: unique opens
+      prisma.emailEvent.findMany({
+        where: { type: "opened", campaign: { userId: user.id }, createdAt: { gte: subDays(new Date(), 30) } },
+        select: { campaignId: true, email: true },
+        distinct: ["campaignId", "email"],
+      }),
+      // Last 30 days: unique clicks
+      prisma.emailEvent.findMany({
+        where: { type: "clicked", campaign: { userId: user.id }, createdAt: { gte: subDays(new Date(), 30) } },
+        select: { campaignId: true, email: true },
+        distinct: ["campaignId", "email"],
       }),
     ]);
 
@@ -44,16 +60,16 @@ export default async function DashboardPage() {
 
   const barData = recentCampaigns.map((c) => ({
     name: c.name.length > 14 ? c.name.slice(0, 14) + "…" : c.name,
-    opens: c.totalOpens, clicks: c.totalClicks, bounces: 0,
+    opens: 0, clicks: 0, bounces: 0,
   }));
 
   const typeCounts: Record<string, number> = {};
   events.forEach((e) => { typeCounts[e.type] = (typeCounts[e.type] ?? 0) + 1; });
   const pieData = Object.entries(typeCounts).map(([name, value]) => ({ name, value }));
 
-  const totalSent  = events.filter((e) => e.type === "sent").length;
-  const totalOpens = events.filter((e) => e.type === "opened").length;
-  const totalClicks = events.filter((e) => e.type === "clicked").length;
+  const totalSent   = recentSentEvents;
+  const totalOpens  = recentOpenPairs.length;
+  const totalClicks = recentClickPairs.length;
 
   return (
     <div className="p-6 space-y-6">
@@ -102,7 +118,7 @@ export default async function DashboardPage() {
                         <Link href={`/campaigns/${c.id}`} className="font-medium text-gray-900 hover:text-brand-600">{c.name}</Link>
                       </td>
                       <td className="px-3 py-3"><StatusBadge status={c.status} /></td>
-                      <td className="px-3 py-3 text-gray-500">{c.totalSent > 0 ? `${pct(c.totalOpens, c.totalSent)} open` : "—"}</td>
+                      <td className="px-3 py-3 text-gray-500">{c.status === "sent" ? "sent" : "—"}</td>
                     </tr>
                   ))}
                 </tbody>

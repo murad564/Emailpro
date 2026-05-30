@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft, Send } from "lucide-react";
 import Link from "next/link";
 import toast from "react-hot-toast";
+import { cn } from "@/lib/utils";
 
 interface Segment {
   id: string;
@@ -30,7 +31,9 @@ export default function NewCampaignPage() {
     replyTo: "",
     segmentId: "",
     htmlContent: `<h2>Hello {{firstName}}!</h2><p>Thanks for subscribing. Here's our latest update…</p>`,
+    textContent: "",
   });
+  const [contentTab, setContentTab] = useState<"visual" | "html" | "text">("visual");
   const [saving, setSaving] = useState(false);
   const [sending, setSending] = useState(false);
 
@@ -186,13 +189,67 @@ export default function NewCampaignPage() {
       {/* Editor */}
       <Card>
         <CardHeader>
-          <CardTitle>Email content</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle>Email content</CardTitle>
+            <div className="flex rounded-lg border border-gray-200 overflow-hidden text-sm">
+              {(["visual", "html", "text"] as const).map((tab) => (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => setContentTab(tab)}
+                  className={cn(
+                    "px-3 py-1.5",
+                    contentTab === tab
+                      ? "bg-brand-600 text-white"
+                      : "text-gray-600 hover:bg-gray-50"
+                  )}
+                >
+                  {tab === "visual" ? "Visual" : tab === "html" ? "HTML" : "Plain Text"}
+                </button>
+              ))}
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="p-0 pb-4">
-          <TiptapEditor
-            value={form.htmlContent}
-            onChange={(html) => set("htmlContent", html)}
-          />
+          {contentTab === "visual" && (
+            <TiptapEditor
+              value={form.htmlContent}
+              onChange={(html) => set("htmlContent", html)}
+            />
+          )}
+          {contentTab === "html" && (
+            <textarea
+              value={form.htmlContent}
+              onChange={(e) => set("htmlContent", e.target.value)}
+              className="w-full min-h-[350px] p-4 font-mono text-sm border-0 focus:outline-none resize-y"
+              placeholder="<h1>Hello</h1><p>Your HTML content here…</p>"
+              spellCheck={false}
+            />
+          )}
+          {contentTab === "text" && (
+            <div className="relative">
+              <textarea
+                value={form.textContent}
+                onChange={(e) => set("textContent", e.target.value)}
+                className="w-full min-h-[350px] p-4 text-sm border-0 focus:outline-none resize-y"
+                placeholder="Plain text version of your email (shown to clients that don't support HTML)…"
+              />
+              {!form.textContent && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    set(
+                      "textContent",
+                      form.htmlContent.replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim()
+                    )
+                  }
+                  className="absolute bottom-3 right-3 text-xs text-brand-600 hover:underline"
+                >
+                  Generate from HTML
+                </button>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
 

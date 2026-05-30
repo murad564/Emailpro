@@ -20,9 +20,10 @@ export interface BrevoSendResult {
 
 export async function sendBrevoEmail(
   payload: BrevoEmailPayload,
+  overrideApiKey?: string,
 ): Promise<BrevoSendResult> {
-  const apiKey = process.env.BREVO_API_KEY;
-  if (!apiKey) throw new Error("BREVO_API_KEY is not set");
+  const apiKey = overrideApiKey || process.env.BREVO_API_KEY;
+  if (!apiKey) throw new Error("Brevo API key is not configured. Add it in Settings.");
 
   const body: Record<string, unknown> = {
     sender:      { name: payload.fromName, email: payload.fromEmail },

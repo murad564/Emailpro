@@ -15,8 +15,20 @@ model User {
   contacts   Contact[]
   segments   Segment[]
   campaigns  Campaign[]
+  settings   UserSettings?
 
   @@map("users")
+}
+
+model UserSettings {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  brevoApiKey    String?
+  dailySendLimit Int      @default(300)
+  updatedAt      DateTime @updatedAt
+
+  @@map("user_settings")
 }
 
 model Contact {

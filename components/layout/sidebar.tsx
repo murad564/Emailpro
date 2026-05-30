@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Users, Filter, Send, BarChart2, Mail } from "lucide-react";
+import { LayoutDashboard, Users, Filter, Send, BarChart2, Mail, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const nav = [
@@ -10,6 +10,7 @@ const nav = [
   { href: "/segments",  label: "Segments",  icon: Filter },
   { href: "/campaigns", label: "Campaigns", icon: Send },
   { href: "/analytics", label: "Analytics", icon: BarChart2 },
+  { href: "/settings",  label: "Settings",  icon: Settings },
 ];
 
 export default function Sidebar() {

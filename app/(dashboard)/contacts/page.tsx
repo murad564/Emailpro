@@ -14,6 +14,7 @@ import {
   Trash2,
   Pencil,
   Users,
+  AlertTriangle,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { format } from "date-fns";
@@ -37,6 +38,7 @@ export default function ContactsPage() {
   const [showImport, setShowImport] = useState(false);
   const [editContact, setEditContact] = useState<Contact | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [sendLimit, setSendLimit] = useState<number>(300);
   const PER_PAGE = 25;
 
   const load = useCallback(async () => {
@@ -56,6 +58,13 @@ export default function ContactsPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    fetch("/api/settings")
+      .then((r) => r.json())
+      .then((d) => { if (d.dailySendLimit) setSendLimit(d.dailySendLimit); })
+      .catch(() => {});
+  }, []);
 
   async function deleteContact(id: string) {
     if (!confirm("Delete this contact?")) return;
@@ -132,6 +141,20 @@ export default function ContactsPage() {
           </Button>
         </div>
       </div>
+
+      {/* Brevo daily limit warning */}
+      {total > sendLimit && (
+        <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-amber-500" />
+          <div>
+            <span className="font-semibold">Brevo daily send limit: {sendLimit.toLocaleString()} emails/day.</span>{" "}
+            Your database has <span className="font-semibold">{total.toLocaleString()}</span> contacts — only the first{" "}
+            <span className="font-semibold">{sendLimit.toLocaleString()}</span> will be reached per campaign send.
+            Use <span className="font-semibold">Segments</span> to target a specific subset, or upgrade your Brevo plan and update the limit in{" "}
+            <a href="/settings" className="underline font-semibold hover:text-amber-900">Settings</a>.
+          </div>
+        </div>
+      )}
 
       {/* Search + bulk actions */}
       <div className="flex items-center gap-3">

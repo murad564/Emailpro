@@ -81,7 +81,8 @@ export default function CampaignDetailPage() {
     const data = await res.json();
     setSending(false);
     if (res.ok) {
-      toast.success(`Sent to ${data.totalSent} contacts!`);
+      const skippedNote = data.skipped > 0 ? ` (${data.skipped} skipped — daily limit reached)` : "";
+      toast.success(`Sent to ${data.totalSent} contacts!${skippedNote}`);
       load();
     } else {
       toast.error(data.error ?? "Send failed");

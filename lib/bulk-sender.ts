@@ -4,8 +4,8 @@ import { buildTrackedEmail, buildPlainText } from "./email-tracker";
 import { contactHasAnyTag, decodeTags } from "./tags";
 import type { Contact, Segment } from "@prisma/client";
 
-const BATCH_SIZE    = 10;
-const BATCH_DELAY_MS = 500; // Brevo free: 300/day — no hard rate limit per second
+const BATCH_SIZE     = 10;
+const BATCH_DELAY_MS = 500;
 
 async function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
@@ -21,7 +21,7 @@ async function getSegmentContacts(segment: Segment, userId: string): Promise<Con
 export async function sendCampaign(
   campaignId: string,
   userId: string,
-): Promise<{ totalSent: number; errors: number }> {
+): Promise<{ totalSent: number; errors: number; skipped: number }> {
   const campaign = await prisma.campaign.findFirst({
     where: { id: campaignId, userId },
     include: { segment: true },
@@ -48,10 +48,18 @@ export async function sendCampaign(
   const unsubSet = new Set(unsubscribed.map((u) => u.email));
   const targets  = contacts.filter((c) => !unsubSet.has(c.email));
 
+  const userSettings = await prisma.userSettings.findUnique({ where: { userId } });
+  const brevoApiKey  = userSettings?.brevoApiKey || process.env.BREVO_API_KEY;
+  if (!brevoApiKey) throw new Error("Brevo API key is not configured. Add it in Settings.");
+
+  const dailyLimit = userSettings?.dailySendLimit ?? 300;
+  const skipped    = Math.max(0, targets.length - dailyLimit);
+  const capped     = targets.slice(0, dailyLimit);
+
   let totalSent = 0, errors = 0;
 
-  for (let i = 0; i < targets.length; i += BATCH_SIZE) {
-    const batch = targets.slice(i, i + BATCH_SIZE);
+  for (let i = 0; i < capped.length; i += BATCH_SIZE) {
+    const batch = capped.slice(i, i + BATCH_SIZE);
 
     await Promise.allSettled(
       batch.map(async (contact) => {
@@ -102,7 +110,7 @@ export async function sendCampaign(
             text:       buildPlainText(html),
             campaignId,
             tags:       [campaignId, sentEvent.trackingId],
-          });
+          }, brevoApiKey);
 
           // Store Brevo message ID for webhook correlation
           if (result.messageId) {
@@ -120,7 +128,7 @@ export async function sendCampaign(
       }),
     );
 
-    if (i + BATCH_SIZE < targets.length) await sleep(BATCH_DELAY_MS);
+    if (i + BATCH_SIZE < capped.length) await sleep(BATCH_DELAY_MS);
   }
 
   await prisma.campaign.update({
@@ -128,5 +136,5 @@ export async function sendCampaign(
     data: { status: "sent", sentAt: new Date(), totalSent },
   });
 
-  return { totalSent, errors };
+  return { totalSent, errors, skipped };
 }
