@@ -18,7 +18,14 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
   const user = await getCurrentUser();
   const campaign = await prisma.campaign.findFirst({
     where: { id: params.id, userId: user.id },
-    include: { segment: true, emailEvents: { orderBy: { createdAt: "desc" }, take: 100 } },
+    include: {
+      segment: true,
+      emailEvents: {
+        where: { type: { notIn: ["sent", "link_registered"] } },
+        orderBy: { createdAt: "desc" },
+        take: 100,
+      },
+    },
   });
   if (!campaign) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json(campaign);

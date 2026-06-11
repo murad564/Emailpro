@@ -14,37 +14,39 @@ interface Segment {
   description: string | null;
   filterType: string;
   filterTags: string[];
+  manualIds: string[];
+  contactLimit: number | null;
   contactCount: number;
   createdAt: string;
 }
 
+const FILTER_LABELS: Record<string, string> = {
+  all:    "All",
+  tags:   "Tag filter",
+  manual: "Manual",
+};
+
 export default function SegmentsPage() {
-  const [segments, setSegments] = useState<Segment[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [showCreate, setShowCreate] = useState(false);
+  const [segments, setSegments]       = useState<Segment[]>([]);
+  const [loading, setLoading]         = useState(true);
+  const [showCreate, setShowCreate]   = useState(false);
   const [editSegment, setEditSegment] = useState<Segment | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
-    const res = await fetch("/api/segments");
+    const res  = await fetch("/api/segments");
     const data = await res.json();
     setSegments(Array.isArray(data) ? data : []);
     setLoading(false);
   }, []);
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  useEffect(() => { load(); }, [load]);
 
   async function deleteSegment(id: string) {
     if (!confirm("Delete this segment?")) return;
     const res = await fetch(`/api/segments/${id}`, { method: "DELETE" });
-    if (res.ok) {
-      toast.success("Segment deleted");
-      load();
-    } else {
-      toast.error("Failed to delete");
-    }
+    if (res.ok) { toast.success("Segment deleted"); load(); }
+    else toast.error("Failed to delete");
   }
 
   return (
@@ -71,11 +73,7 @@ export default function SegmentsPage() {
           <p className="text-sm text-gray-400 mt-1">
             Create segments to target specific groups of contacts
           </p>
-          <Button
-            className="mt-4"
-            size="sm"
-            onClick={() => setShowCreate(true)}
-          >
+          <Button className="mt-4" size="sm" onClick={() => setShowCreate(true)}>
             Create first segment
           </Button>
         </div>
@@ -88,13 +86,9 @@ export default function SegmentsPage() {
             >
               <div className="flex items-start justify-between mb-3">
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-gray-900 truncate">
-                    {seg.name}
-                  </h3>
+                  <h3 className="font-semibold text-gray-900 truncate">{seg.name}</h3>
                   {seg.description && (
-                    <p className="text-xs text-gray-500 mt-0.5 truncate">
-                      {seg.description}
-                    </p>
+                    <p className="text-xs text-gray-500 mt-0.5 truncate">{seg.description}</p>
                   )}
                 </div>
                 <div className="flex items-center gap-1 ml-2">
@@ -113,24 +107,33 @@ export default function SegmentsPage() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-3 text-sm text-gray-500">
+              <div className="flex items-center gap-3 text-sm text-gray-500 flex-wrap">
                 <span className="flex items-center gap-1">
                   <Users className="w-3.5 h-3.5" />
                   {seg.contactCount.toLocaleString()} contacts
                 </span>
                 <Badge variant="gray" className="text-xs">
-                  {seg.filterType === "all" ? "All" : "Tag filter"}
+                  {FILTER_LABELS[seg.filterType] ?? seg.filterType}
                 </Badge>
+                {seg.contactLimit && seg.filterType !== "manual" && (
+                  <Badge variant="info" className="text-xs">
+                    limit {seg.contactLimit.toLocaleString()}
+                  </Badge>
+                )}
               </div>
 
-              {seg.filterTags.length > 0 && (
+              {seg.filterType === "tags" && seg.filterTags.length > 0 && (
                 <div className="flex flex-wrap gap-1 mt-3">
                   {seg.filterTags.map((t) => (
-                    <Badge key={t} variant="info">
-                      {t}
-                    </Badge>
+                    <Badge key={t} variant="info">{t}</Badge>
                   ))}
                 </div>
+              )}
+
+              {seg.filterType === "manual" && (
+                <p className="text-xs text-gray-400 mt-3">
+                  {seg.manualIds.length.toLocaleString()} contacts hand-picked
+                </p>
               )}
 
               <p className="text-xs text-gray-400 mt-3">
@@ -141,37 +144,25 @@ export default function SegmentsPage() {
         </div>
       )}
 
-      <Modal
-        open={showCreate}
-        onClose={() => setShowCreate(false)}
-        title="Create segment"
-      >
+      <Modal open={showCreate} onClose={() => setShowCreate(false)} title="Create segment">
         <SegmentForm
-          onSuccess={() => {
-            setShowCreate(false);
-            load();
-          }}
+          onSuccess={() => { setShowCreate(false); load(); }}
         />
       </Modal>
 
-      <Modal
-        open={!!editSegment}
-        onClose={() => setEditSegment(null)}
-        title="Edit segment"
-      >
+      <Modal open={!!editSegment} onClose={() => setEditSegment(null)} title="Edit segment">
         {editSegment && (
           <SegmentForm
             initial={{
-              id: editSegment.id,
-              name: editSegment.name,
-              description: editSegment.description ?? "",
-              filterType: editSegment.filterType as "all" | "tags",
-              filterTags: editSegment.filterTags,
+              id:           editSegment.id,
+              name:         editSegment.name,
+              description:  editSegment.description ?? "",
+              filterType:   editSegment.filterType as "all" | "tags" | "manual",
+              filterTags:   editSegment.filterTags,
+              manualIds:    editSegment.manualIds,
+              contactLimit: editSegment.contactLimit,
             }}
-            onSuccess={() => {
-              setEditSegment(null);
-              load();
-            }}
+            onSuccess={() => { setEditSegment(null); load(); }}
           />
         )}
       </Modal>

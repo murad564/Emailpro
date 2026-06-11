@@ -8,6 +8,7 @@ import { StatusBadge } from "@/components/ui/badge";
 import { pct, formatNumber } from "@/lib/utils";
 import { subDays, format } from "date-fns";
 import { BarChart2, Send, MousePointerClick, Users } from "lucide-react";
+import { SyncBrevoButton } from "@/components/dashboard/sync-button";
 import Link from "next/link";
 
 export default async function AnalyticsPage() {
@@ -124,11 +125,14 @@ export default async function AnalyticsPage() {
 
   return (
     <div className="p-6 space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Analytics</h1>
-        <p className="text-sm text-gray-500 mt-0.5">
-          All metrics are computed from real email events — {formatNumber(totalContacts)} contacts
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Analytics</h1>
+          <p className="text-sm text-gray-500 mt-0.5">
+            All metrics are computed from real email events — {formatNumber(totalContacts)} contacts
+          </p>
+        </div>
+        <SyncBrevoButton />
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

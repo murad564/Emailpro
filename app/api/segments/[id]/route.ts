@@ -5,10 +5,12 @@ import { encodeTags } from "@/lib/serialize";
 import { z } from "zod";
 
 const schema = z.object({
-  name:        z.string().min(1).optional(),
-  description: z.string().nullable().optional(),
-  filterType:  z.enum(["all", "tags"]).optional(),
-  filterTags:  z.array(z.string()).optional(),
+  name:         z.string().min(1).optional(),
+  description:  z.string().nullable().optional(),
+  filterType:   z.enum(["all", "tags", "manual"]).optional(),
+  filterTags:   z.array(z.string()).optional(),
+  manualIds:    z.array(z.string()).optional(),
+  contactLimit: z.number().int().positive().nullable().optional(),
 });
 
 export async function PUT(req: Request, { params }: { params: { id: string } }) {
@@ -18,8 +20,13 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
   if (!parse.success)
     return NextResponse.json({ error: parse.error.errors[0].message }, { status: 400 });
 
-  const { filterTags, ...rest } = parse.data;
-  const data = { ...rest, ...(filterTags !== undefined && { filterTags: encodeTags(filterTags) }) };
+  const { filterTags, manualIds, contactLimit, ...rest } = parse.data;
+  const data = {
+    ...rest,
+    ...(filterTags  !== undefined && { filterTags:   encodeTags(filterTags) }),
+    ...(manualIds   !== undefined && { manualIds:    encodeTags(manualIds) }),
+    ...(contactLimit !== undefined && { contactLimit }),
+  };
 
   const result = await prisma.segment.updateMany({
     where: { id: params.id, userId: user.id },

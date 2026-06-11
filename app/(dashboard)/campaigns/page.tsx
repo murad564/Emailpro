@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/badge";
@@ -26,14 +26,49 @@ export default function CampaignsPage() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState<string | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     const res = await fetch("/api/campaigns");
     const data = await res.json();
-    setCampaigns(Array.isArray(data) ? data : []);
-    setLoading(false);
+    const list: Campaign[] = Array.isArray(data) ? data : [];
+    setCampaigns(list);
+    if (!silent) setLoading(false);
+    return list;
   }, []);
+
+  // Poll every 3 s while any campaign is in "sending" state
+  useEffect(() => {
+    function startPolling() {
+      if (pollRef.current) return;
+      pollRef.current = setInterval(async () => {
+        const list = await load(true);
+        const stillSending = list.some((c) => c.status === "sending");
+        if (!stillSending) {
+          clearInterval(pollRef.current!);
+          pollRef.current = null;
+        }
+      }, 3000);
+    }
+
+    const hasSending = campaigns.some((c) => c.status === "sending");
+    if (hasSending) {
+      startPolling();
+    } else {
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+    }
+
+    return () => {
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+    };
+  }, [campaigns, load]);
 
   useEffect(() => {
     load();
@@ -46,7 +81,8 @@ export default function CampaignsPage() {
     const res = await fetch(`/api/campaigns/${id}/send`, { method: "POST" });
     const data = await res.json();
     if (res.ok) {
-      toast.success(`Sent to ${data.totalSent} contacts!`);
+      const note = data.skipped > 0 ? ` (${data.skipped} skipped — daily limit)` : "";
+      toast.success(`Sending started${note} — page will update automatically.`);
       load();
     } else {
       toast.error(data.error ?? "Send failed");

@@ -13,15 +13,19 @@ export function deserializeContacts<T extends { tags: string }>(
   return contacts.map(deserializeContact);
 }
 
-export function deserializeSegment<T extends { filterTags: string }>(
+export function deserializeSegment<T extends { filterTags: string; manualIds?: string }>(
   s: T,
-): Omit<T, "filterTags"> & { filterTags: string[] } {
-  return { ...s, filterTags: decodeTags(s.filterTags) };
+): Omit<T, "filterTags" | "manualIds"> & { filterTags: string[]; manualIds: string[] } {
+  return {
+    ...s,
+    filterTags: decodeTags(s.filterTags),
+    manualIds: decodeTags((s as { manualIds?: string }).manualIds ?? "[]"),
+  };
 }
 
-export function deserializeSegments<T extends { filterTags: string }>(
+export function deserializeSegments<T extends { filterTags: string; manualIds?: string }>(
   segs: T[],
-): (Omit<T, "filterTags"> & { filterTags: string[] })[] {
+): (Omit<T, "filterTags" | "manualIds"> & { filterTags: string[]; manualIds: string[] })[] {
   return segs.map(deserializeSegment);
 }
 
