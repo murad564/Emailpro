@@ -5,11 +5,12 @@ import { sendBrevoEmail } from "@/lib/brevo";
 
 export async function POST(req: Request) {
   const user = await getCurrentUser();
-  const { toEmail, fromEmail, fromName, htmlBody } = (await req.json()) as {
+  const { toEmail, fromEmail, fromName, htmlBody, apiKey: bodyApiKey } = (await req.json()) as {
     toEmail?: string;
     fromEmail?: string;
     fromName?: string;
     htmlBody?: string;
+    apiKey?: string;
   };
 
   if (!toEmail || !fromEmail || !fromName) {
@@ -17,10 +18,13 @@ export async function POST(req: Request) {
   }
 
   const settings = await prisma.userSettings.findUnique({ where: { userId: user.id } });
-  const apiKey = settings?.brevoApiKey || process.env.BREVO_API_KEY;
+  const apiKey = bodyApiKey?.trim() || settings?.brevoApiKey || process.env.BREVO_API_KEY;
 
   if (!apiKey || apiKey === "paste-your-key-here") {
-    return NextResponse.json({ error: "No Brevo API key configured. Save your key in Settings first." }, { status: 400 });
+    return NextResponse.json({ error: "No Brevo API key configured. Enter your key in the field above and save it first." }, { status: 400 });
+  }
+  if (!apiKey.startsWith("xkeysib-")) {
+    return NextResponse.json({ error: "Wrong key type. Your key starts with 'xsmtpsib-' which is an SMTP credential - it won't work with the REST API. Go to app.brevo.com > Settings > API Keys and generate a key that starts with 'xkeysib-'." }, { status: 400 });
   }
 
   try {

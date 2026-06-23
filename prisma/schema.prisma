@@ -52,15 +52,17 @@ model Contact {
 }
 
 model Segment {
-  id          String   @id @default(cuid())
-  name        String
-  description String?
-  filterType  String   @default("all")
-  filterTags  String   @default("[]")
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id           String   @id @default(cuid())
+  name         String
+  description  String?
+  filterType   String   @default("all")
+  filterTags   String   @default("[]")
+  manualIds    String   @default("[]")
+  contactLimit Int?
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   campaigns Campaign[]
 
@@ -95,6 +97,8 @@ model Campaign {
   totalUniqueClicks Int       @default(0)
   totalBounces      Int       @default(0)
   totalUnsubscribes Int       @default(0)
+  totalErrors       Int       @default(0)
+  totalSkipped      Int       @default(0)
 
   emailEvents EmailEvent[]
 

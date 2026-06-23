@@ -133,7 +133,7 @@ export async function sendCampaign(
 
   await prisma.campaign.update({
     where: { id: campaignId },
-    data: { status: "sent", sentAt: new Date(), totalSent },
+    data: { status: "sent", sentAt: new Date(), totalSent, totalErrors: errors, totalSkipped: skipped },
   });
 
   return { totalSent, errors, skipped };

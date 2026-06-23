@@ -33,6 +33,12 @@ export function SettingsForm({ initialApiKey, initialDailySendLimit }: Props) {
     setSaveError("");
     setSaved(false);
 
+    if (apiKey && !apiKey.trim().startsWith("xkeysib-")) {
+      setSaveError("Invalid key format. Brevo API keys start with 'xkeysib-'. You may have pasted an SMTP key instead - generate an API key at app.brevo.com > Settings > API Keys.");
+      setSaving(false);
+      return;
+    }
+
     try {
       const res = await fetch("/api/settings", {
         method: "PUT",
@@ -58,7 +64,7 @@ export function SettingsForm({ initialApiKey, initialDailySendLimit }: Props) {
       const res = await fetch("/api/settings/test-email", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ toEmail, fromEmail, fromName, htmlBody }),
+        body: JSON.stringify({ toEmail, fromEmail, fromName, htmlBody, apiKey }),
       });
       const data = await res.json() as { ok?: boolean; error?: string };
       setTestResult(data);
