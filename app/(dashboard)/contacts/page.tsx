@@ -353,7 +353,8 @@ export default function ContactsPage() {
       >
         <CsvImport
           onSuccess={() => {
-            setShowImport(false);
+            // Refresh the table but leave the modal open so the import summary
+            // (imported / skipped / per-row errors) stays visible.
             load();
           }}
         />

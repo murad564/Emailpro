@@ -133,6 +133,15 @@ export function CsvImport({ onSuccess }: { onSuccess: () => void }) {
               {result.skipped} skipped (duplicates / invalid)
             </div>
           )}
+          {result.errors.length > 0 && (
+            <ul className="mt-2 space-y-0.5 text-xs text-gray-500">
+              {result.errors.map((e, i) => (
+                <li key={i} className="truncate" title={e}>
+                  {e}
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
 
