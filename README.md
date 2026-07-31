@@ -1,17 +1,30 @@
 # EmailPro — Bulk Email Marketing Platform
 
-A fully functional bulk email marketing platform built with Next.js 14, Supabase, Prisma, and Resend.
+A bulk email marketing platform built with Next.js 14, Prisma, SQLite, and Brevo.
+
+## Quick start
+
+```bash
+npm install
+npm run setup     # creates prisma/dev.db + generates the Prisma client
+npm run db:seed   # optional: 80 demo contacts, 3 segments, 3 campaigns
+npm run dev       # → http://localhost:3000
+```
+
+No environment variables, no external accounts, and no login are required to
+boot the app. It opens straight onto the dashboard. You only need a Brevo API
+key when you actually want to *send* mail — add it in **Settings** in the UI, or
+set `BREVO_API_KEY` (see [Sending email](#sending-email)).
 
 ## Features
 
-- **Auth** — Supabase signup/login with session management
 - **Contacts** — CRUD, CSV import/export, tag management, bulk delete
 - **Segments** — Filter contacts by tags for targeted campaigns
 - **Campaign Composer** — Rich text editor (Tiptap) with full formatting toolbar
-- **Bulk Sending** — Rate-limited batch sending via Resend API
+- **Bulk Sending** — Rate-limited batch sending via Brevo API
 - **Open Tracking** — 1×1 pixel tracking per contact per campaign
 - **Click Tracking** — Link wrapping with redirect-and-record
-- **Webhooks** — Resend delivery event webhooks (delivered, bounced, complained)
+- **Webhooks** — Brevo delivery event webhooks (delivered, bounced, complained)
 - **Unsubscribe** — Auto-generated token-based unsubscribe page
 - **Analytics** — Open rate, click rate, bounce rate charts (Recharts)
 - **Dashboard** — 30-day overview with line + pie + bar charts
@@ -23,9 +36,9 @@ A fully functional bulk email marketing platform built with Next.js 14, Supabase
 | Framework | Next.js 14 (App Router) |
 | Language | TypeScript |
 | Styling | Tailwind CSS |
-| Auth | Supabase Auth |
-| Database | Supabase Postgres via Prisma ORM |
-| Email | Resend API |
+| Auth | None — single local demo user (`lib/current-user.ts`) |
+| Database | SQLite (`prisma/dev.db`) via Prisma ORM |
+| Email | Brevo API |
 | Editor | Tiptap |
 | Charts | Recharts |
 | CSV | PapaParse |
@@ -39,94 +52,98 @@ cd emailpro
 npm install
 ```
 
-### 2. Environment variables
+### 2. Database
+
+The app uses a local SQLite file — nothing to provision.
 
 ```bash
-cp .env.example .env.local
+npm run setup      # prisma db push + prisma generate → creates prisma/dev.db
 ```
 
-Fill in `.env.local`:
+The database path is hardcoded in `prisma/schema.prisma`; `DATABASE_URL` is not
+read.
 
-| Variable | Where to get it |
-|----------|----------------|
-| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project → Settings → API → Project URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase project → Settings → API → anon public key |
-| `DATABASE_URL` | Supabase project → Settings → Database → Connection pooling URI (port 6543) |
-| `DIRECT_URL` | Supabase project → Settings → Database → Direct connection URI (port 5432) |
-| `RESEND_API_KEY` | resend.com → API Keys |
-| `RESEND_WEBHOOK_SECRET` | resend.com → Webhooks → your endpoint → Signing Secret |
-| `NEXT_PUBLIC_APP_URL` | `http://localhost:3000` (dev) or your deployment URL |
-
-### 3. Supabase setup
-
-1. Create a project at [supabase.com](https://supabase.com)
-2. In **Authentication → URL Configuration** add `http://localhost:3000` to allowed redirect URLs
-3. Disable email confirmation for easier local dev: **Authentication → Providers → Email → Disable "Confirm email"**
-
-### 4. Database migration
-
-```bash
-npm run db:push        # Push schema to Supabase Postgres
-npm run db:generate    # Generate Prisma client
-```
-
-### 5. Seed with demo data (optional)
-
-First, create a user in Supabase Auth manually (or via the app signup).  
-Then run:
+### 3. Seed with demo data (optional)
 
 ```bash
 npm run db:seed
 ```
 
-### 6. Start dev server
+Creates the demo user, 80 contacts, 3 segments and 3 campaigns. Re-running it
+wipes and recreates that data.
+
+> Note: the seed fills in each campaign's aggregate counters but does not create
+> `email_events` rows. The Campaigns list reads the counters, while Analytics and
+> the dashboard charts derive their numbers from events — so with seed data only,
+> Analytics shows zeroes while Campaigns shows open/click rates. Sending a real
+> campaign populates both.
+
+### 4. Start dev server
 
 ```bash
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000)
+Open [http://localhost:3000](http://localhost:3000). There is no login — every
+request is attributed to a single local demo user defined in
+`lib/current-user.ts`.
 
-## Resend Setup
+### 5. Environment variables (optional)
 
-### Free tier limits
-- 3,000 emails/month
-- 100 emails/day
-- 1 verified domain or use `onboarding@resend.dev` for testing
+None are required to run the app. `.env.example` lists the two that matter:
 
-### Testing without a domain
-Set `DEFAULT_FROM_EMAIL=onboarding@resend.dev` and you can send to your own verified email address only.
+| Variable | Purpose | Default if unset |
+|----------|---------|------------------|
+| `BREVO_API_KEY` | Sending mail. The Settings page stores a key in the database, which takes priority over this. | unset — sending fails |
+| `NEXT_PUBLIC_APP_URL` | Base URL baked into tracking pixels and click-redirect links. | `http://localhost:3000` |
 
-### Production domain
-1. Add your domain in Resend → Domains
-2. Add the DNS records shown
-3. Update `DEFAULT_FROM_EMAIL` to `you@yourdomain.com`
+```bash
+cp .env.example .env.local   # only if you want to set these
+```
+
+## Sending email
+
+Sending goes through [Brevo](https://www.brevo.com) (free tier: 300 emails/day).
+
+1. Get an API key: Brevo → **Settings → API Keys → Create a new API key**
+2. Paste it into the app's **Settings** page (stored per-user in the database),
+   or set `BREVO_API_KEY` in `.env.local`
+3. Use **Settings → send a test email** to verify before running a campaign
+
+The daily send cap is configurable in Settings (`dailySendLimit`, default 300)
+and enforced by `lib/bulk-sender.ts`.
 
 ### Webhook setup
-1. In Resend → Webhooks → Add endpoint: `https://yourdomain.com/api/webhooks/resend`
-2. Select events: `email.delivered`, `email.bounced`, `email.complained`
-3. Copy the signing secret to `RESEND_WEBHOOK_SECRET`
+
+For delivery/bounce/complaint events, point a Brevo webhook at
+`https://yourdomain.com/api/webhooks/brevo` and select the `delivered`, `bounced`
+(hard + soft) and `spam` events.
+
+> `app/api/webhooks/resend/` and `lib/resend.ts` are leftovers from an earlier
+> Resend integration and are not part of the active send path.
 
 ## Project Structure
 
 ```
 emailpro/
 ├── app/
-│   ├── (auth)/          # Login, signup pages
-│   ├── (dashboard)/     # Protected dashboard pages
+│   ├── (dashboard)/     # Dashboard pages
 │   │   ├── page.tsx          # Dashboard home
 │   │   ├── contacts/         # Contact management
 │   │   ├── segments/         # Audience segments
 │   │   ├── campaigns/        # Campaign composer + list
-│   │   └── analytics/        # Analytics overview
+│   │   ├── analytics/        # Analytics overview
+│   │   └── settings/         # Brevo API key + send limit
 │   ├── api/
 │   │   ├── contacts/         # Contact CRUD + CSV import/export
 │   │   ├── segments/         # Segment CRUD
 │   │   ├── campaigns/        # Campaign CRUD + send trigger
+│   │   ├── settings/         # Settings read/write + test email
+│   │   ├── sync/brevo/       # Pull stats back from Brevo
 │   │   ├── track/
 │   │   │   ├── open/         # 1x1 pixel tracking
 │   │   │   └── click/        # Click-through tracking
-│   │   └── webhooks/resend/  # Resend delivery webhooks
+│   │   └── webhooks/brevo/   # Brevo delivery webhooks
 │   └── unsubscribe/[token]/  # Public unsubscribe page
 ├── components/
 │   ├── ui/              # Button, Input, Card, Badge, Modal
@@ -134,22 +151,25 @@ emailpro/
 │   ├── contacts/        # ContactForm, CsvImport
 │   ├── campaigns/       # TiptapEditor
 │   ├── segments/        # SegmentForm
-│   └── dashboard/       # StatsCard, Charts
+│   ├── settings/        # SettingsForm
+│   └── dashboard/       # StatsCard, Charts, SyncButton
 ├── lib/
-│   ├── supabase/        # Browser + server clients
 │   ├── prisma.ts        # Prisma singleton
-│   ├── resend.ts        # Resend singleton
+│   ├── brevo.ts         # Brevo API client
+│   ├── current-user.ts  # Local demo user (stands in for auth)
 │   ├── email-tracker.ts # Pixel + link injection
 │   └── bulk-sender.ts   # Batched send engine
 └── prisma/
     ├── schema.prisma    # DB schema
+    ├── dev.db           # SQLite database (gitignored)
     └── seed.ts          # Demo data seed
 ```
 
 ## Database Schema
 
 ```
-users          → Prisma mirror of Supabase auth users
+users          → Local demo user
+user_settings  → Per-user Brevo API key + daily send limit
 contacts       → Email list with tags
 segments       → Named filters (all / by-tag)
 campaigns      → Email campaigns with stats counters
@@ -161,6 +181,7 @@ unsubscribes   → Per-contact per-campaign unsubscribe tokens
 
 | Script | Description |
 |--------|-------------|
+| `npm run setup` | One-shot first-run: create `prisma/dev.db` + generate the client |
 | `npm run dev` | Start development server |
 | `npm run build` | Production build |
 | `npm run db:push` | Push Prisma schema to DB |
