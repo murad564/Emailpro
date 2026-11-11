@@ -23,6 +23,7 @@ import campaigns from './routes/campaigns.js';
 import brevoRoutes, { registerBrevoJobs } from './routes/brevo.js';
 import { users, settings, suppression, dashboard } from './routes/admin.js';
 import { mediaApi, mediaPublic } from './routes/media.js';
+import googleAuth, { googleEnabled } from './google.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -38,6 +39,7 @@ app.use(
         'frame-src': ["'self'", 'blob:', 'data:'],
         'style-src': ["'self'", "'unsafe-inline'"],
         'font-src': ["'self'", 'data:', 'https:'],
+        'form-action': ["'self'", 'https://accounts.google.com'],
       },
     },
     crossOriginEmbedderPolicy: false,
@@ -75,6 +77,9 @@ app.post('/api/auth/login', loginLimiter, asyncH(async (req, res) => {
   issueSession(res, user);
   res.json({ user: { id: user.id, email: user.email, name: user.name, role: user.role } });
 }));
+
+app.get('/api/auth/config', (req, res) => res.json({ google: googleEnabled() }));
+app.use('/api/auth/google', googleAuth);
 
 app.post('/api/auth/logout', (req, res) => {
   clearSession(res);
